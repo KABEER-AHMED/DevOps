@@ -1,6 +1,6 @@
 git status
 git add .
-read comment
+comment="$*"
 git commit -m "$comment"
 git push origin main
 
