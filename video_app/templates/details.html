@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Options for {{ title }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+</head>
+<body>
+    <main class="container">
+        <nav>
+            <ul>
+                <li><strong><a href="/">‹ Back</a></strong></li>
+            </ul>
+        </nav>
+        <h2>{{ title }}</h2>
+
+        {% if error %}
+            <article style="background-color: #fdd;">
+                <p><strong>Error:</strong> {{ error }}</p>
+            </article>
+        {% endif %}
+
+        {% if video_formats %}
+            <h3>📹 Video Downloads (MP4 / WEBM)</h3>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Quality</th>
+                            <th>Format</th>
+                            <th>Size</th>
+                            <th>Download</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for f in video_formats %}
+                        <tr>
+                            <td>{{ f.quality }}</td>
+                            <td>{{ f.ext }}</td>
+                            <td>{{ f.filesize_str }}</td>
+                            <td><a href="{{ f.url }}" role="button" class="outline" download>Download</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+
+        {% if audio_formats %}
+            <h3>🎵 Audio Only Downloads (MP3 / M4A)</h3>
+             <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Quality (Bitrate)</th>
+                            <th>Format</th>
+                            <th>Size</th>
+                            <th>Download</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for f in audio_formats %}
+                        <tr>
+                            <td>{{ f.quality }}</td>
+                            <td>{{ f.ext }}</td>
+                            <td>{{ f.filesize_str }}</td>
+                            <td><a href="{{ f.url }}" role="button" class="outline" download>Download</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+
+    </main>
+</body>
+</html>
