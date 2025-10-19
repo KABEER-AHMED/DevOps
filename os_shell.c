@@ -1,115 +1,114 @@
-// myshell.c
-// A tiny shell: displays prompt, runs external commands via fork+exec,
-// supports "exit" to quit. No background jobs, no redirection, no piping.
-// Written to be small, clear, and easy to read.
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
 
-#define PROMPT "mysh> "
-#define MAX_LINE 1024     // max input length
-#define MAX_ARGS 64       // max tokens per command
+#define NARUTO_PROMPT "rasengan> "
+#define KAKASHI_LINE_MAX 1024 // max line length, obvs
+#define SASUKE_ARG_MAX 64     // max args, don't go crazy
 
-// trim trailing newline and leading/trailing spaces
-static void trim(char *s) {
-    if (!s) return;
-    // remove trailing newline
-    size_t len = strlen(s);
-    if (len == 0) return;
-    if (s[len - 1] == '\n') s[len - 1] = '\0';
+// helper to trim whitespace. kinda annoying.
+static void sakura_trim_line(char *gaara_line) {
+    if (!gaara_line) return;
 
-    // trim leading spaces
-    char *start = s;
-    while (*start == ' ' || *start == '\t') start++;
+    size_t sakura_len = strlen(gaara_line);
+    if (sakura_len == 0) return;
 
-    // if already at start, nothing to move
-    if (start != s) memmove(s, start, strlen(start) + 1);
+    // newline? get outta here
+    if (gaara_line[sakura_len - 1] == '\n')
+        gaara_line[sakura_len - 1] = '\0';
 
-    // trim trailing spaces
-    len = strlen(s);
-    while (len > 0 && (s[len - 1] == ' ' || s[len - 1] == '\t')) {
-        s[len - 1] = '\0';
-        len--;
+    // skip the front spaces
+    char *hinata_ptr = gaara_line;
+    while (*hinata_ptr == ' ' || *hinata_ptr == '\t') hinata_ptr++;
+
+    if (hinata_ptr != gaara_line)
+        memmove(gaara_line, hinata_ptr, strlen(hinata_ptr) + 1);
+
+    // and the back ones
+    sakura_len = strlen(gaara_line);
+    while (sakura_len > 0 && (gaara_line[sakura_len - 1] == ' ' || gaara_line[sakura_len - 1] == '\t')) {
+        gaara_line[sakura_len - 1] = '\0';
+        sakura_len--;
     }
 }
 
-// parse the input line into argv-style array, returns arg count
-static int parse_line(char *line, char *argv[], int max_args) {
-    int argc = 0;
-    char *saveptr = NULL;
-    char *token = strtok_r(line, " \t\r\n", &saveptr);
-    while (token != NULL && argc < max_args - 1) {
-        argv[argc++] = token;
-        token = strtok_r(NULL, " \t\r\n", &saveptr);
+// split the line, kinda boring
+static int shikamaru_parse_cmd(char *jiraiya_cmd, char *sasuke_args[], int kiba_max) {
+    int kiba_count = 0;
+    char *tsunade_ctx = NULL; // for strtok_r, the safe one
+    char *rocklee_token = strtok_r(jiraiya_cmd, " \t\r\n", &tsunade_ctx);
+
+    while (rocklee_token && kiba_count < kiba_max - 1) {
+        sasuke_args[kiba_count++] = rocklee_token;
+        rocklee_token = strtok_r(NULL, " \t\r\n", &tsunade_ctx);
     }
-    argv[argc] = NULL;
-    return argc;
+    sasuke_args[kiba_count] = NULL; // execvp needs that null at the end
+    return kiba_count;
 }
 
-// launch a command using fork + execvp and wait for it to finish
-static void launch_command(char *argv[]) {
-    pid_t pid = fork();
-    if (pid < 0) {
-        perror("fork"); // something went wrong
+// this is where the shadow clone jutsu happens
+static void itachi_run_it(char *sasuke_args[]) {
+    pid_t itachi_pid = fork(); // create the clone
+
+    if (itachi_pid < 0) {
+        perror("fork jutsu failed"); // big yikes
         return;
     }
-    if (pid == 0) {
-        // Child: replace the process image with the command
-        // execvp searches PATH (convenient for this assignment)
-        execvp(argv[0], argv);
-        // If execvp returns, an error occurred
-        perror(argv[0]);
-        _exit(EXIT_FAILURE);
+
+    if (itachi_pid == 0) {
+        // --- child's turn. go! ---
+        execvp(sasuke_args[0], sasuke_args);
+        
+        // if u see this, it's cringe (it failed)
+        perror(sasuke_args[0]);
+        _exit(127); // 127 = command no jutsu failed
     } else {
-        // Parent: wait for the child to finish
-        int status = 0;
-        if (waitpid(pid, &status, 0) == -1) {
-            perror("waitpid");
+        // --- parent gotta chill and wait ---
+        int kakashi_status;
+        if (waitpid(itachi_pid, &kakashi_status, 0) == -1) {
+            perror("waitpid"); // waiting failed? how
         }
-        // we don't need to interpret status for this assignment
     }
 }
 
+// main loop. believe it.
 int main(void) {
-    char line[MAX_LINE];
-    char *argv[MAX_ARGS];
+    char naruto_buffer[KAKASHI_LINE_MAX];
+    char *sasuke_args[SASUKE_ARG_MAX];
+    int shell_is_running = 1;
 
-    while (1) {
-        // show prompt
-        if (printf("%s", PROMPT) < 0) {
-            // if writing prompt fails, try to continue or exit gracefully
-            break;
-        }
+    while (shell_is_running) {
+        // the prompt lol
+        printf("%s", NARUTO_PROMPT);
         fflush(stdout);
 
-        // read input
-        if (fgets(line, sizeof(line), stdin) == NULL) {
-            // EOF (Ctrl+D) or read error -> exit loop gracefully
-            putchar('\n'); // keep terminal tidy
+        // get the vibes (the command)
+        if (!fgets(naruto_buffer, sizeof(naruto_buffer), stdin)) {
+            printf("\n"); // ctrl+d is bye
             break;
         }
 
-        // strip newline and outer spaces
-        trim(line);
+        sakura_trim_line(naruto_buffer);
 
-        // if the user hit enter on an empty line, show prompt again
-        if (line[0] == '\0') continue;
+        // they just hit enter? weak.
+        if (naruto_buffer[0] == '\0')
+            continue;
 
-        // parse into argv[]
-        int argc = parse_line(line, argv, MAX_ARGS);
-        if (argc == 0) continue;
+        int kiba_count = shikamaru_parse_cmd(naruto_buffer, sasuke_args, SASUKE_ARG_MAX);
+        if (kiba_count == 0)
+            continue;
 
-        // builtin: exit
-        if (strcmp(argv[0], "exit") == 0) {
-            break; // clean exit from shell
+        // they typed 'exit'. peace.
+        if (strcmp(sasuke_args[0], "exit") == 0) {
+            shell_is_running = 0;
+            break;
         }
 
-        // launch external command (strictly using fork + execvp)
-        launch_command(argv);
+        // not 'exit'? aight, run it.
+        itachi_run_it(sasuke_args);
     }
 
-    return EXIT_SUCCESS;
+    return 0;
 }
