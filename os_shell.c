@@ -1,12 +1,7 @@
-/**
- * myshell.c
- *
- * A minimal Linux shell implementation in C.
- * This program displays a prompt, reads a command line,
- * parses it into arguments, and executes the command
- * using fork() and execvp(). It also includes a
- * built-in 'exit' command.
- */
+// myshell.c
+// A tiny shell: displays prompt, runs external commands via fork+exec,
+// supports "exit" to quit. No background jobs, no redirection, no piping.
+// Written to be small, clear, and easy to read.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,75 +9,106 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-// Define constants for buffer sizes
-#define MAX_LINE_LENGTH 1024 // Max length of a command line
-#define MAX_ARGS 64          // Max number of arguments per command
+#define PROMPT "mysh> "
+#define MAX_LINE 1024     // max input length
+#define MAX_ARGS 64       // max tokens per command
 
-int main() {
-    char line[MAX_LINE_LENGTH]; // Buffer for user input
-    char *args[MAX_ARGS];       // Array of pointers to argument strings
-    int should_run = 1;         // Flag to control the main loop
+// trim trailing newline and leading/trailing spaces
+static void trim(char *s) {
+    if (!s) return;
+    // remove trailing newline
+    size_t len = strlen(s);
+    if (len == 0) return;
+    if (s[len - 1] == '\n') s[len - 1] = '\0';
 
-    while (should_run) {
-        // 1. Display the prompt
-        printf("mysh> ");
-        fflush(stdout); // Ensure the prompt is displayed immediately
+    // trim leading spaces
+    char *start = s;
+    while (*start == ' ' || *start == '\t') start++;
 
-        // Read a line of input from the user
+    // if already at start, nothing to move
+    if (start != s) memmove(s, start, strlen(start) + 1);
+
+    // trim trailing spaces
+    len = strlen(s);
+    while (len > 0 && (s[len - 1] == ' ' || s[len - 1] == '\t')) {
+        s[len - 1] = '\0';
+        len--;
+    }
+}
+
+// parse the input line into argv-style array, returns arg count
+static int parse_line(char *line, char *argv[], int max_args) {
+    int argc = 0;
+    char *saveptr = NULL;
+    char *token = strtok_r(line, " \t\r\n", &saveptr);
+    while (token != NULL && argc < max_args - 1) {
+        argv[argc++] = token;
+        token = strtok_r(NULL, " \t\r\n", &saveptr);
+    }
+    argv[argc] = NULL;
+    return argc;
+}
+
+// launch a command using fork + execvp and wait for it to finish
+static void launch_command(char *argv[]) {
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork"); // something went wrong
+        return;
+    }
+    if (pid == 0) {
+        // Child: replace the process image with the command
+        // execvp searches PATH (convenient for this assignment)
+        execvp(argv[0], argv);
+        // If execvp returns, an error occurred
+        perror(argv[0]);
+        _exit(EXIT_FAILURE);
+    } else {
+        // Parent: wait for the child to finish
+        int status = 0;
+        if (waitpid(pid, &status, 0) == -1) {
+            perror("waitpid");
+        }
+        // we don't need to interpret status for this assignment
+    }
+}
+
+int main(void) {
+    char line[MAX_LINE];
+    char *argv[MAX_ARGS];
+
+    while (1) {
+        // show prompt
+        if (printf("%s", PROMPT) < 0) {
+            // if writing prompt fails, try to continue or exit gracefully
+            break;
+        }
+        fflush(stdout);
+
+        // read input
         if (fgets(line, sizeof(line), stdin) == NULL) {
-            // Handle EOF (Ctrl+D) as an exit command
-            printf("\n");
+            // EOF (Ctrl+D) or read error -> exit loop gracefully
+            putchar('\n'); // keep terminal tidy
             break;
         }
 
-        // Remove the trailing newline character read by fgets
-        line[strcspn(line, "\n")] = 0;
+        // strip newline and outer spaces
+        trim(line);
 
-        // 2. Parse the input line into arguments
-        int arg_count = 0;
-        char *token = strtok(line, " \t\r\n\a"); // Tokenize by whitespace
+        // if the user hit enter on an empty line, show prompt again
+        if (line[0] == '\0') continue;
 
-        while (token != NULL && arg_count < MAX_ARGS - 1) {
-            args[arg_count] = token;
-            arg_count++;
-            token = strtok(NULL, " \t\r\n\a");
-        }
-        
-        // Terminate the argument list with NULL for execvp
-        args[arg_count] = NULL;
+        // parse into argv[]
+        int argc = parse_line(line, argv, MAX_ARGS);
+        if (argc == 0) continue;
 
-        // If no command was entered, continue to the next prompt
-        if (args[0] == NULL) {
-            continue;
+        // builtin: exit
+        if (strcmp(argv[0], "exit") == 0) {
+            break; // clean exit from shell
         }
 
-        // 3. Check for the built-in 'exit' command
-        if (strcmp(args[0], "exit") == 0) {
-            should_run = 0; // Set the flag to terminate the loop
-        } else {
-            // 4. Execute the external command
-            pid_t pid = fork();
-
-            if (pid < 0) {
-                // Fork failed
-                perror("fork");
-            } else if (pid == 0) {
-                // --- This is the Child Process ---
-                
-                // Use execvp to find the command in the system's PATH
-                // and replace the child process with it.
-                if (execvp(args[0], args) == -1) {
-                    // If execvp returns, an error occurred (e.g., command not found)
-                    perror(args[0]);
-                    exit(EXIT_FAILURE); // Exit the child process on failure
-                }
-            } else {
-                // --- This is the Parent Process ---
-                
-                // Wait for the child process to complete
-                wait(NULL);
-            }
-        }
+        // launch external command (strictly using fork + execvp)
+        launch_command(argv);
     }
 
     return EXIT_SUCCESS;
